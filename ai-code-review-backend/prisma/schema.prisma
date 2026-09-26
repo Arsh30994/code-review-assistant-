@@ -1,0 +1,185 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────
+// User
+// ─────────────────────────────────────────────
+model User {
+  id           String        @id @default(uuid()) @db.Uuid
+  email        String        @unique
+  passwordHash String
+  name         String
+  avatarUrl    String?
+  role         Role          @default(DEVELOPER)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  projects     Project[]
+  chatSessions ChatSession[]
+
+  @@map("users")
+}
+
+enum Role {
+  ADMIN
+  DEVELOPER
+  VIEWER
+}
+
+// ─────────────────────────────────────────────
+// Project
+// ─────────────────────────────────────────────
+model Project {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String
+  description String?
+  repoUrl     String?
+  language    String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  ownerId String @db.Uuid
+  owner   User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  files        File[]
+  reviews      Review[]
+  chatSessions ChatSession[]
+
+  @@map("projects")
+}
+
+// ─────────────────────────────────────────────
+// File
+// ─────────────────────────────────────────────
+model File {
+  id        String   @id @default(uuid()) @db.Uuid
+  path      String
+  language  String?
+  content   String   @db.Text
+  hash      String
+  size      Int      @default(0)   // file size in bytes
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  projectId String  @db.Uuid
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  reviews Review[]
+
+  @@unique([projectId, path])
+  @@map("files")
+}
+
+// ─────────────────────────────────────────────
+// Review
+// ─────────────────────────────────────────────
+model Review {
+  id              String       @id @default(uuid()) @db.Uuid
+  status          ReviewStatus @default(PENDING)
+  mode            ReviewMode   @default(QUALITY)
+  scope           ReviewScope  @default(PROJECT)
+  targetFileIds   String[]     @default([])
+  summary         String       @db.Text
+  recommendations String       @db.Text
+  issues          Json         @default("[]")
+  score           Int?
+  tokensUsed      Int?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  projectId  String      @db.Uuid
+  project    Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  fileId     String?     @db.Uuid
+  file       File?       @relation(fields: [fileId], references: [id], onDelete: SetNull)
+  providerId String?     @db.Uuid
+  provider   AIProvider? @relation(fields: [providerId], references: [id])
+
+  @@map("reviews")
+}
+
+enum ReviewMode {
+  SECURITY
+  PERFORMANCE
+  QUALITY
+}
+
+enum ReviewScope {
+  FILE
+  FILES
+  PROJECT
+}
+
+enum ReviewStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+}
+
+// ─────────────────────────────────────────────
+// ChatSession
+// ─────────────────────────────────────────────
+model ChatSession {
+  id        String   @id @default(uuid()) @db.Uuid
+  title     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId    String   @db.Uuid
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectId String?  @db.Uuid
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  messages Message[]
+
+  @@map("chat_sessions")
+}
+
+// ─────────────────────────────────────────────
+// Message
+// ─────────────────────────────────────────────
+model Message {
+  id         String      @id @default(uuid()) @db.Uuid
+  role       MessageRole
+  content    String      @db.Text
+  tokensUsed Int?
+  createdAt  DateTime    @default(now())
+
+  sessionId String      @db.Uuid
+  session   ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@map("messages")
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+// ─────────────────────────────────────────────
+// AIProvider
+// ─────────────────────────────────────────────
+model AIProvider {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @unique
+  baseUrl   String
+  apiKey    String?
+  model     String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  reviews Review[]
+
+  @@map("ai_providers")
+}
