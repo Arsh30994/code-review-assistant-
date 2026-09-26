@@ -7,6 +7,7 @@ import { AIProvider, AIProviderConfig, ChatMessage } from './ai.provider';
 import { OpenAIProvider } from './providers/openai.provider';
 import { LMStudioProvider } from './providers/lmstudio.provider';
 import { OllamaProvider } from './providers/ollama.provider';
+import { GroqProvider } from './providers/groq.provider';
 
 @Injectable()
 export class AIService {
@@ -65,6 +66,10 @@ export class AIService {
 
     if (normalized.includes('ollama') || config.baseUrl.includes(':11434')) {
       return new OllamaProvider(config);
+    }
+
+    if (normalized.includes('groq') || config.baseUrl.includes('groq.com')) {
+      return new GroqProvider(config);
     }
 
     return new OpenAIProvider(config);
